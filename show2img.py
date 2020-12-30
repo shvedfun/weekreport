@@ -41,33 +41,33 @@ class ManageActs():
 
 
 class Show():
-    def __init__(self, num_axes, start, width, figsize = [10, 6]):
+    def __init__(self, num_axes, start, width, figsize = [10, 6], button_show = True):
         self.change = True
         self.num_axes = num_axes
         self.fig, self.ax = plt.subplots(num_axes, figsize = figsize)
-        self.fig.subplots_adjust(bottom=0.1)
+        self.fig.subplots_adjust(left = 0.04, right=0.98, top=0.95, bottom=0.04)
+        if button_show:
+            self.forward = plt.axes([0.85, 0.01, 0.07, 0.05])
+            self.backward = plt.axes([0.7, 0.01, 0.07, 0.05])
+            self.wider = plt.axes([0.30, 0.01, 0.07, 0.05])
+            self.tighter = plt.axes([0.15, 0.01, 0.07, 0.05])
+            self.aut = plt.axes([0.47, 0.01, 0.07, 0.05])
+            self.close = plt.axes([0.05, 0.01, 0.04, 0.05])
 
-        self.forward = plt.axes([0.85, 0.01, 0.07, 0.05])
-        self.backward = plt.axes([0.7, 0.01, 0.07, 0.05])
-        self.wider = plt.axes([0.30, 0.01, 0.07, 0.05])
-        self.tighter = plt.axes([0.15, 0.01, 0.07, 0.05])
-        self.aut = plt.axes([0.47, 0.01, 0.07, 0.05])
-        self.close = plt.axes([0.05, 0.01, 0.04, 0.05])
+            self.but_forward = wd.Button(self.forward, "Вперед")
+            self.but_backward = wd.Button(self.backward, 'Назад')
+            self.but_wider = wd.Button(self.wider, 'Шире')
+            self.but_tighter = wd.Button(self.tighter, 'Уже')
+            self.but_auto = wd.Button(self.aut, 'Auto')
+            self.but_close = wd.Button(self.close, 'Close')
 
-        self.but_forward = wd.Button(self.forward, "Вперед")
-        self.but_backward = wd.Button(self.backward, 'Назад')
-        self.but_wider = wd.Button(self.wider, 'Шире')
-        self.but_tighter = wd.Button(self.tighter, 'Уже')
-        self.but_auto = wd.Button(self.aut, 'Auto')
-        self.but_close = wd.Button(self.close, 'Close')
-
-        self.ma = ManageActs(self.ax, self)
-        self.but_forward.on_clicked(self.ma.forward)
-        self.but_backward.on_clicked(self.ma.backward)
-        self.but_wider.on_clicked(self.ma.wider)
-        self.but_tighter.on_clicked(self.ma.tighter)
-        self.but_auto.on_clicked(self.ma.change_auto)
-        self.but_close.on_clicked(self.ma.close)
+            self.ma = ManageActs(self.ax, self)
+            self.but_forward.on_clicked(self.ma.forward)
+            self.but_backward.on_clicked(self.ma.backward)
+            self.but_wider.on_clicked(self.ma.wider)
+            self.but_tighter.on_clicked(self.ma.tighter)
+            self.but_auto.on_clicked(self.ma.change_auto)
+            self.but_close.on_clicked(self.ma.close)
 
         self.plot_array = []
         self.scatter_array = []

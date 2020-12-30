@@ -116,7 +116,7 @@ def prepare_data(dict_res_df):
         res_df['Delta_T'] = res_df['TIR811'] - res_df['TIR812']
         res_df['Q'] = (res_df['Delta_T'] * res_df['FIRC17']).rolling(15, min_periods=1).mean()
         res_df['FIRC841/Q'] = res_df['FIRC841']/res_df['Q']
-        res_df['Q/FIRC841'] = res_df['Q']/(res_df['FIRC841'].rolling(60, min_periods=1).mean()*res_df['D61_H2O_mn_align'])
+        res_df['QFIRC841'] = res_df['Q']/(res_df['FIRC841'].rolling(60, min_periods=1).mean()*res_df['D61_H2O_mn_align'])
 
         dict_res_df[bgs_id] = {'res_df':res_df}
 
@@ -138,6 +138,34 @@ def analisys4percent(res_df, params_limit, loc_dict):
         loc_dict['ADV_PIR16_perc'] = perc_PIR16
     return res_df, loc_dict
 
+def add_all_img(context, dict_res_df, sh_prop):
+    # Подготавливаю картинку
+    showlist = {}
+    for bgs_id, _ in dict_res_df.items():
+        print(f'Show BGS={bgs_id}')
+        res_df = dict_res_df[bgs_id]['res_df']
+        print(f'res_df.columns = {res_df.columns}')
+        res_df['newtime'] = res_df['newtime'] + pd.Timedelta(hours=3)
+        res_df.set_index('newtime', drop=False, inplace=True)
+        res_df = res_df.sort_index()
+
+        show = sh.Show(len(sh_prop), start, int((finish - start) / datetime.timedelta(minutes=1)), figsize=[11, 6.5],
+                       button_show=False)  # +pd.Timedelta(hours=3)
+
+        showlist[bgs_id] = show
+        show.fig.suptitle(f'БГС №{bgs_id}', fontsize=12)
+        for key, prop in sh_prop.items():
+            for name, col_name in prop.items():
+                show.add_plot(key, res_df['newtime'], res_df[col_name], label=name)
+
+    imgs = {}
+    for bgs_id, _ in showlist.items():
+        showlist[bgs_id].change_plot(0.1, legend=True)
+        showlist[bgs_id].savefig('imgtmp_' + str(bgs_id) + '.png')  # , dpi = 200
+        context['imgall_' + str(bgs_id)] = docxtpl.InlineImage(doc, 'imgtmp_' + str(bgs_id) + '.png')
+    plt.close('all')
+    return context
+
 params_limit = {'PIRC4463': {'diff': 0.3,'time_diff': 15},'TIR812': {'diff': 2,'time_diff': 70},'PIR16': {'diff': 1,'time_diff': 20}}
 
 params_dict = {'KS_2': 'KS_2_align', 'KS_2_5': 'KS_2_5_align', 'KS_Dcp': 'KS_Dcp_align', 'BGS_2_5': 'BGS_2_5_align',
@@ -149,8 +177,12 @@ parameter_properties = {'FIRC841':{'show':True,}
     , 'WFIR21':{'show':True,}
     , 'PIRC4463':{'show':True, 'adv_show':'ADV_PIRC4463'}
     , 'TIR812':{'show':True, 'adv_show':'ADV_TIR812'}
-    , 'TIR811':{'show':True,}
     ,  'PIR16':{'show':True, 'adv_show':'ADV_PIR16'}
+    , 'TIR811':{'show':True,}
+    , 'FIRC17':{'show':True,}
+    , 'Delta_T':{'show':True,}
+    , 'Q':{'show':True,}
+    , 'QFIRC841':{'show':False,}
     ,}
 conf = {'template_name': 'WeekReportTmplt.docx', 'weeks': {'week2020-11-02':{'start': '2020-11-02'}
     ,'week2020-11-09':{'start': '2020-11-09'}
@@ -158,6 +190,10 @@ conf = {'template_name': 'WeekReportTmplt.docx', 'weeks': {'week2020-11-02':{'st
     ,'week2020-11-23':{'start': '2020-11-23'}
     ,'week2020-11-30':{'start': '2020-11-30'}
     ,'week2020-12-07':{'start': '2020-12-07'}
+    ,'week2020-12-14':{'start': '2020-12-14'}
+    ,'week2020-12-21':{'start': '2020-12-21'}
+    ,'NS2020-09-25':{'start': '2020-09-25', 'finish':'2020-12-04', 'name_report':'Отчет производства NS'}
+    ,'IAS2020-12-05':{'start': '2020-12-05', 'finish':'2020-12-19', 'name_report':'Отчет производства ИАС'}
     ,}}
 
 SKIP_EXIST = True
@@ -165,15 +201,22 @@ SKIP_EXIST = True
 if __name__ == '__main__':
 
     for week, prop in conf['weeks'].items():
-        start = datetime.datetime.strptime(prop['start'], '%Y-%m-%d')
-        print(f'start = {start}')
-        otchet_file_name = os.getcwd()+'\\save\\'+'WeekReport'+str(start.year)+str(start.month)+str(start.day)+'.docx'
+        otchet_file_name = os.getcwd()+'\\save\\'+week+'.docx' #'WeekReport'+str(start.year)+str(start.month)+str(start.day)
         if os.path.exists(otchet_file_name) and SKIP_EXIST:
             continue
-        doc = docxtpl.DocxTemplate(conf['template_name'])
         context = {}
+        if 'name_report' in prop.keys():
+            context['name_report'] = prop['name_report']
+        else:
+            context['name_report'] = 'Еженедельный отчет'
+        start = datetime.datetime.strptime(prop['start'], '%Y-%m-%d')
+        print(f'start = {start}')
+        doc = docxtpl.DocxTemplate(conf['template_name'])
         context['start'] = start
-        finish = start + datetime.timedelta(days=7) #datetime.datetime.strptime(conf['finish'], '%Y-%m-%d') - datetime.timedelta(minutes=1)
+        if 'finish' in prop.keys():
+            finish = datetime.datetime.strptime(prop['finish'], '%Y-%m-%d')
+        else:
+            finish = start + datetime.timedelta(days=7) #datetime.datetime.strptime(conf['finish'], '%Y-%m-%d') - datetime.timedelta(minutes=1)
         context['finish'] = finish
         print(f'start = {start}, finish = {finish}')
         # Читаю и подготвавливаю данные
@@ -184,7 +227,7 @@ if __name__ == '__main__':
             print(f'Show BGS={bgs_id}')
             df = dict_res_df[bgs_id]['res_df']
             df = df[(df.index>=start)&(df.index<finish)]
-            wrk_tm = df[df['FIRC841'] > 0]['FIRC841'].count()
+            wrk_tm = df[df['FIRC841'] > 1]['FIRC841'].count()
             stop_tm = int((finish - start)/datetime.timedelta(minutes=1)) - wrk_tm
             context['worktime_' + str(bgs_id)] = str(int(wrk_tm/60)) + ' ч. ' + str(int(wrk_tm%60)) + ' мин.'
             context['stoptime_' + str(bgs_id)] = str(int(stop_tm/60)) + ' ч. ' + str(int(stop_tm%60)) + ' мин.'
@@ -199,12 +242,18 @@ if __name__ == '__main__':
             context['ADV_PIRC4463_perc_' + str(bgs_id)] = loc_dict['ADV_PIRC4463_perc']
             context['ADV_TIR812_perc_' + str(bgs_id)] = loc_dict['ADV_TIR812_perc']
             context['ADV_PIR16_perc_' + str(bgs_id)] = loc_dict['ADV_PIR16_perc']
+            context['bad_2_5_' + str(bgs_id)] = round(loc_dict['Вып.отсева.2_5'],2)
+            context['percent_bad_2_5_' + str(bgs_id)] = round(loc_dict['Вып.отсева.2_5']/loc_dict['Выпущено']*100.,2)
+            context['bad_2_' + str(bgs_id)] = round(loc_dict['Вып.отсева.2'], 2)
+            context['percent_bad_2_' + str(bgs_id)] = round(loc_dict['Вып.отсева.2']/loc_dict['Выпущено']*100., 2)
 
+            df_tmp = df[df['FIRC841']>1.]
             for param, prop in parameter_properties.items():
-                context[param+'_'+str(bgs_id)+'_mean'] = round(df[param].mean(),2)
-                context[param+'_'+str(bgs_id)+'_std'] = round(df[param].std(),2)
+                context[param+'_'+str(bgs_id)+'_mean'] = round(df_tmp[param].mean(),2)
+                context[param+'_'+str(bgs_id)+'_std'] = round(df_tmp[param].std(),2)
                 if prop['show']:
                     fig, ax = plt.subplots(1, figsize=[11,2])
+                    fig.subplots_adjust(left=0.04, right=0.98, top=0.95, bottom=0.12)
                     ax.plot(df.index, df[param], label = param)
                     if 'adv_show' in prop.keys():
                         ax.plot(df.index, df[prop['adv_show']], label = prop['adv_show'])
@@ -217,33 +266,7 @@ if __name__ == '__main__':
                     context['img_' + param + '_' + str(bgs_id)] = docxtpl.InlineImage(doc, namefltmp)
 
         print(f'context = {context}')
-
-        # Подготавливаю картинку
-        showlist = {}
-        for bgs_id, _ in dict_res_df.items():
-            print(f'Show BGS={bgs_id}')
-            res_df = dict_res_df[bgs_id]['res_df']
-            print(f'res_df.columns = {res_df.columns}')
-            res_df['newtime'] = res_df['newtime'] + pd.Timedelta(hours=3)
-            res_df.set_index('newtime', drop=False, inplace=True)
-            res_df = res_df.sort_index()
-
-            show = sh.Show(len(sh_prop), start, int((finish - start)/datetime.timedelta(minutes=1)))  # +pd.Timedelta(hours=3)
-
-            showlist[bgs_id] = show
-            show.fig.suptitle(f'БГС №{bgs_id}', fontsize=12)
-            for key, prop in sh_prop.items():
-                for name, col_name in prop.items():
-                    show.add_plot(key, res_df['newtime'], res_df[col_name], label=name)
-
-            #
-        imgs = {}
-        for bgs_id, _ in showlist.items():
-            showlist[bgs_id].change_plot(0.1, legend=True)
-            showlist[bgs_id].savefig('imgtmp_'+str(bgs_id)+'.png') #, dpi = 200
-            context['imgall_'+str(bgs_id)] = docxtpl.InlineImage(doc, 'imgtmp_'+str(bgs_id)+'.png')
-        plt.close('all')
-        #otchet_file_name = os.getcwd()+'\\save\\'+'WeekReport'+str(start.year)+str(start.month)+str(start.day)+'.docx'
+        context = add_all_img(context, dict_res_df, sh_prop)
         render_doc(doc, context, otchet_file_name)
 
 
